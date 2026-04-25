@@ -95,11 +95,11 @@ def _build_description(workout: dict) -> str:
 
     distance = _parse_float(workout.get("distance_km"))
     if distance is not None:
-        parts.append(f"Distance: {distance:g} km")
+        parts.append(f"Distance: {distance:.1f} km")
 
     elevation = _parse_float(workout.get("elevation_m"))
     if elevation is not None:
-        parts.append(f"Elevation gain: {elevation:g} m")
+        parts.append(f"Elevation gain: {elevation:.0f} m")
 
     notes = str(workout.get("notes") or "").strip()
     if notes:

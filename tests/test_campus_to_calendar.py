@@ -94,7 +94,7 @@ class TestBuildDescription(unittest.TestCase):
 
     def test_only_distance(self):
         desc = _build_description({"distance_km": 5.0})
-        self.assertIn("5 km", desc)
+        self.assertIn("5.0 km", desc)
         self.assertNotIn("Elevation", desc)
 
     def test_only_elevation(self):
