@@ -55,9 +55,9 @@ Each workout in the Campus Coach weekly plan becomes a calendar event with:
 - the workout **title** (e.g. *Strength & Conditioning*)
 - the prescribed **duration** (e.g. 30 min)
 
-Events are created as **all-day events** spread across the week (Monday =
-Workout 1, Tuesday = Workout 2, …).  You can drag them to any time slot you
-like in Google Calendar.
+Events are created with specific start times: **17:00** when there is a single
+workout on a day, or **10:00** for the first and **17:00** for the second
+when two workouts fall on the same day.
 
 ---
 

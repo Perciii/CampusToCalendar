@@ -170,7 +170,8 @@ def assign_slots(count: int, week_start: date) -> list[tuple[date, str]]:
     Time assignment
     ---------------
     * A day with exactly 1 workout → **17:00**
-    * A day with 2+ workouts       → first at **10:00**, second onwards at **17:00**
+    * A day with 2 workouts        → first at **10:00**, second at **17:00**
+    * A day with 3+ workouts       → first at **10:00**, remaining at **17:00**
     """
     base = count // 7
     extra = count % 7
