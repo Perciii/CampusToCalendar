@@ -1,0 +1,7 @@
+name,date,time,duration_minutes,distance_km,elevation_m,notes
+Easy Run,2024-06-03,07:30,45,8.0,50,Keep heart rate under 140 bpm
+Interval Training,2024-06-05,07:00,60,10.0,30,6x800m at 5K pace with 90s recovery
+Long Run,2024-06-08,08:00,90,16.0,120,Steady aerobic pace throughout
+Rest / Mobility,2024-06-10,,30,,,Foam rolling and stretching only
+Tempo Run,2024-06-12,07:00,50,9.0,40,20 min at tempo effort
+Hill Repeats,2024-06-14,07:30,55,8.5,400,8x steep hill repeats

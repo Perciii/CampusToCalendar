@@ -1,0 +1,46 @@
+[
+  {
+    "name": "Easy Run",
+    "date": "2024-06-03",
+    "time": "07:30",
+    "duration_minutes": 45,
+    "distance_km": 8.0,
+    "elevation_m": 50,
+    "notes": "Keep heart rate under 140 bpm"
+  },
+  {
+    "name": "Interval Training",
+    "date": "2024-06-05",
+    "time": "07:00",
+    "duration_minutes": 60,
+    "distance_km": 10.0,
+    "elevation_m": 30,
+    "notes": "6x800m at 5K pace with 90s recovery"
+  },
+  {
+    "name": "Long Run",
+    "date": "2024-06-08",
+    "time": "08:00",
+    "duration_minutes": 90,
+    "distance_km": 16.0,
+    "elevation_m": 120,
+    "notes": "Steady aerobic pace throughout"
+  },
+  {
+    "name": "Tempo Run",
+    "date": "2024-06-12",
+    "time": "07:00",
+    "duration_minutes": 50,
+    "distance_km": 9.0,
+    "elevation_m": 40
+  },
+  {
+    "name": "Hill Repeats",
+    "date": "2024-06-14",
+    "time": "07:30",
+    "duration_minutes": 55,
+    "distance_km": 8.5,
+    "elevation_m": 400,
+    "notes": "8x steep hill repeats"
+  }
+]
