@@ -25,14 +25,22 @@ debugging when selectors stop matching after a Campus Coach UI update):
 
     python scraper.py --headed
 
-How dates are assigned
-----------------------
+How dates and times are assigned
+---------------------------------
 Campus Coach's weekly plan lists workouts in order ("Workout 1 of 8",
 "Workout 2 of 8", …) without pinning each one to a specific day.  The
-scraper spreads them across the week starting on Monday: Workout 1 → Monday,
-Workout 2 → Tuesday, etc.  If there are more workouts than days in the week,
-they wrap into the next week.  All events are created as all-day events so
-you can drag them to whatever time slot suits you in Google Calendar.
+scraper spreads them across the week starting on Monday using the following
+rule:
+
+* **≤ 7 workouts** – one workout per day, starting on Monday, each at 17:00.
+* **8 workouts** – two on Monday (10:00 & 17:00), then one per day
+  Tuesday–Sunday at 17:00.
+* **9 workouts** – two on Monday & Tuesday, one per day Wednesday–Sunday.
+* In general: ``extra = count % 7`` days receive two workouts; the remaining
+  days receive one (or zero, if count < 7).
+
+A day with a single workout starts at **17:00**.
+A day with two workouts has the first at **10:00** and the second at **17:00**.
 
 Customising selectors
 ---------------------
@@ -142,6 +150,42 @@ def dates_for_workouts(week_start: date, count: int) -> list[date]:
     return [week_start + timedelta(days=i) for i in range(count)]
 
 
+def assign_slots(count: int, week_start: date) -> list[tuple[date, str]]:
+    """
+    Distribute *count* workouts across the 7 days of the week that starts on
+    *week_start* (Monday) and return a list of ``(date, time_str)`` tuples,
+    one per workout.
+
+    Distribution rule
+    -----------------
+    Let ``base = count // 7`` and ``extra = count % 7``.
+    The first *extra* days receive ``base + 1`` workouts; the remaining days
+    receive *base* workouts.  This means that, for the common cases:
+
+    * 7 workouts  → 1 per day (Mon–Sun)
+    * 8 workouts  → 2 on Mon, 1 on Tue–Sun
+    * 9 workouts  → 2 on Mon, 2 on Tue, 1 on Wed–Sun
+    * 14 workouts → 2 per day (Mon–Sun)
+
+    Time assignment
+    ---------------
+    * A day with exactly 1 workout → **17:00**
+    * A day with 2+ workouts       → first at **10:00**, second onwards at **17:00**
+    """
+    base = count // 7
+    extra = count % 7
+    slots: list[tuple[date, str]] = []
+    for day_idx in range(7):
+        n = base + (1 if day_idx < extra else 0)
+        if n == 0:
+            continue
+        d = week_start + timedelta(days=day_idx)
+        for slot_idx in range(n):
+            time_str = "10:00" if (n > 1 and slot_idx == 0) else "17:00"
+            slots.append((d, time_str))
+    return slots
+
+
 # ---------------------------------------------------------------------------
 # HTML / page parsing helpers (testable without a real browser)
 # ---------------------------------------------------------------------------
@@ -154,11 +198,17 @@ def extract_workouts_from_cards(
     Convert a list of raw card dicts (keys: ``title``, ``duration_text``)
     into a list of workout dicts compatible with ``campus_to_calendar.create_calendar``.
 
-    Each workout is assigned to a consecutive day starting on *week_start*.
-    Workouts with no parseable duration are skipped with a warning.
+    Dates and times are assigned via :func:`assign_slots`:
+
+    * ≤ 7 workouts → one per day, each at **17:00**.
+    * 8 workouts   → two on Monday (10:00 & 17:00), one per day Tue–Sun at 17:00.
+    * 9 workouts   → two on Mon, two on Tue, one per day Wed–Sun, etc.
+
+    Cards with unparseable or missing titles / durations are skipped with a
+    warning; the remaining valid workouts are then slotted into the week.
     """
-    result = []
-    day_offset = 0
+    # --- first pass: validate ---
+    valid: list[dict] = []
     for i, card in enumerate(cards, start=1):
         title = (card.get("title") or "").strip()
         duration_text = (card.get("duration_text") or "").strip()
@@ -176,17 +226,14 @@ def extract_workouts_from_cards(
             )
             continue
 
-        workout_date = week_start + timedelta(days=day_offset)
-        result.append(
-            {
-                "name": title,
-                "date": workout_date.isoformat(),
-                "duration_minutes": duration_minutes,
-            }
-        )
-        day_offset += 1
+        valid.append({"name": title, "duration_minutes": duration_minutes})
 
-    return result
+    # --- second pass: assign date/time slots ---
+    slots = assign_slots(len(valid), week_start)
+    return [
+        {**w, "date": d.isoformat(), "time": t}
+        for w, (d, t) in zip(valid, slots)
+    ]
 
 
 # ---------------------------------------------------------------------------

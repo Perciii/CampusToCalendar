@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, patch
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from scraper import (
+    assign_slots,
     dates_for_workouts,
     extract_workouts_from_cards,
     main,
@@ -111,6 +112,70 @@ class TestDatesForWorkouts(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
+# assign_slots
+# ---------------------------------------------------------------------------
+
+class TestAssignSlots(unittest.TestCase):
+    def _mon(self):
+        return date(2024, 6, 3)  # Monday
+
+    def test_zero_workouts(self):
+        self.assertEqual(assign_slots(0, self._mon()), [])
+
+    def test_one_workout_at_5pm(self):
+        slots = assign_slots(1, self._mon())
+        self.assertEqual(slots, [(date(2024, 6, 3), "17:00")])
+
+    def test_seven_workouts_one_per_day_at_5pm(self):
+        slots = assign_slots(7, self._mon())
+        self.assertEqual(len(slots), 7)
+        for i, (d, t) in enumerate(slots):
+            self.assertEqual(d, date(2024, 6, 3) + timedelta(days=i))
+            self.assertEqual(t, "17:00")
+
+    def test_eight_workouts_first_day_double(self):
+        # 8 workouts: Mon gets 2 (10:00 + 17:00), Tue–Sun each get 1 (17:00)
+        slots = assign_slots(8, self._mon())
+        self.assertEqual(len(slots), 8)
+        self.assertEqual(slots[0], (date(2024, 6, 3), "10:00"))  # Mon #1
+        self.assertEqual(slots[1], (date(2024, 6, 3), "17:00"))  # Mon #2
+        for i in range(2, 8):
+            d, t = slots[i]
+            self.assertEqual(d, date(2024, 6, 3) + timedelta(days=i - 1))
+            self.assertEqual(t, "17:00")
+
+    def test_nine_workouts_two_days_doubled(self):
+        slots = assign_slots(9, self._mon())
+        self.assertEqual(len(slots), 9)
+        # Mon: 10:00 and 17:00
+        self.assertEqual(slots[0], (date(2024, 6, 3), "10:00"))
+        self.assertEqual(slots[1], (date(2024, 6, 3), "17:00"))
+        # Tue: 10:00 and 17:00
+        self.assertEqual(slots[2], (date(2024, 6, 4), "10:00"))
+        self.assertEqual(slots[3], (date(2024, 6, 4), "17:00"))
+        # Wed onward: 17:00
+        for i in range(4, 9):
+            _, t = slots[i]
+            self.assertEqual(t, "17:00")
+
+    def test_fourteen_workouts_all_days_double(self):
+        slots = assign_slots(14, self._mon())
+        self.assertEqual(len(slots), 14)
+        for day in range(7):
+            first = slots[day * 2]
+            second = slots[day * 2 + 1]
+            expected_date = date(2024, 6, 3) + timedelta(days=day)
+            self.assertEqual(first, (expected_date, "10:00"))
+            self.assertEqual(second, (expected_date, "17:00"))
+
+    def test_two_workouts_on_same_day_times(self):
+        # count=2 → base=0, extra=2 → day0 gets 1, day1 gets 1 (no doubling)
+        slots = assign_slots(2, self._mon())
+        self.assertEqual(slots[0], (date(2024, 6, 3), "17:00"))
+        self.assertEqual(slots[1], (date(2024, 6, 4), "17:00"))
+
+
+# ---------------------------------------------------------------------------
 # extract_workouts_from_cards
 # ---------------------------------------------------------------------------
 
@@ -131,6 +196,45 @@ class TestExtractWorkoutsFromCards(unittest.TestCase):
         self.assertEqual(result[1]["name"], "Base Endurance")
         self.assertEqual(result[1]["duration_minutes"], 50)
         self.assertEqual(result[1]["date"], "2024-06-04")
+
+    def test_single_workout_gets_5pm(self):
+        cards = [{"title": "Easy Run", "duration_text": "30 min"}]
+        result = extract_workouts_from_cards(cards, self._week())
+        self.assertEqual(result[0]["time"], "17:00")
+
+    def test_seven_workouts_all_at_5pm(self):
+        cards = [{"title": f"W{i}", "duration_text": "30 min"} for i in range(7)]
+        result = extract_workouts_from_cards(cards, self._week())
+        for w in result:
+            self.assertEqual(w["time"], "17:00")
+
+    def test_eight_workouts_first_day_double(self):
+        # 8 workouts: Mon gets two (10:00 + 17:00), Tue–Sun get one at 17:00
+        cards = [{"title": f"W{i}", "duration_text": "30 min"} for i in range(8)]
+        result = extract_workouts_from_cards(cards, self._week())
+        self.assertEqual(len(result), 8)
+        self.assertEqual(result[0]["date"], "2024-06-03")  # Mon
+        self.assertEqual(result[0]["time"], "10:00")
+        self.assertEqual(result[1]["date"], "2024-06-03")  # Mon (2nd)
+        self.assertEqual(result[1]["time"], "17:00")
+        # Tue–Sun: one workout each at 17:00
+        for i in range(2, 8):
+            self.assertEqual(result[i]["time"], "17:00")
+            expected_date = (date(2024, 6, 3) + timedelta(days=i - 1)).isoformat()
+            self.assertEqual(result[i]["date"], expected_date)
+
+    def test_nine_workouts_two_days_doubled(self):
+        cards = [{"title": f"W{i}", "duration_text": "30 min"} for i in range(9)]
+        result = extract_workouts_from_cards(cards, self._week())
+        self.assertEqual(len(result), 9)
+        self.assertEqual(result[0]["date"], "2024-06-03")
+        self.assertEqual(result[0]["time"], "10:00")
+        self.assertEqual(result[1]["date"], "2024-06-03")
+        self.assertEqual(result[1]["time"], "17:00")
+        self.assertEqual(result[2]["date"], "2024-06-04")
+        self.assertEqual(result[2]["time"], "10:00")
+        self.assertEqual(result[3]["date"], "2024-06-04")
+        self.assertEqual(result[3]["time"], "17:00")
 
     def test_cards_with_hours_and_minutes(self):
         cards = [{"title": "Long Run", "duration_text": "1h30"}]
@@ -161,7 +265,7 @@ class TestExtractWorkoutsFromCards(unittest.TestCase):
         result = extract_workouts_from_cards([], self._week())
         self.assertEqual(result, [])
 
-    def test_consecutive_dates_assigned(self):
+    def test_consecutive_dates_assigned_seven_workouts(self):
         cards = [
             {"title": f"Workout {i}", "duration_text": "30 min"}
             for i in range(1, 8)
@@ -180,6 +284,11 @@ class TestExtractWorkoutsFromCards(unittest.TestCase):
         cards = [{"title": "Run", "duration_text": "Duration: 45 min"}]
         result = extract_workouts_from_cards(cards, self._week())
         self.assertEqual(result[0]["duration_minutes"], 45)
+
+    def test_workouts_have_time_field(self):
+        cards = [{"title": "Run", "duration_text": "30 min"}]
+        result = extract_workouts_from_cards(cards, self._week())
+        self.assertIn("time", result[0])
 
 
 # ---------------------------------------------------------------------------
