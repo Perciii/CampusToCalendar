@@ -1,36 +1,37 @@
 # CampusToCalendar
 
-Export your planned **Campus Coach** running workouts to a standard `.ics`
-calendar file that can be imported into **Google Calendar**, **Apple
-Calendar**, or any other iCalendar-compatible app.
+Automatically export your planned **Campus Coach** running workouts to a
+standard `.ics` calendar file that you can import directly into **Google
+Calendar** or **Apple Calendar**.
 
 ---
 
-## Features
+## How it works
 
-- Reads planned workout data from a **CSV** or **JSON** file
-- Creates one calendar event per workout containing:
-  - **Name** / title
-  - **Date and start time**
-  - **Planned duration**
-  - **Planned distance** (km) – optional
-  - **Elevation gain** (m) – optional
-  - **Notes** – optional
-- Rows with missing required fields are skipped with a warning rather
-  than aborting the whole export
-- Output is a standards-compliant `.ics` file (RFC 5545)
+The tool logs into the **Campus Coach web app** using your account
+credentials, navigates to your weekly training plan, and extracts the title
+and duration of every workout card.  It then writes a `.ics` file with one
+calendar event per workout, which you import into Google Calendar in a single
+click.
+
+```
+Campus Coach web app  →  scraper.py  →  workouts.ics  →  Google Calendar
+```
 
 ---
 
 ## Requirements
 
-- Python 3.10+
-- [`icalendar`](https://pypi.org/project/icalendar/) library
+- Python 3.10 or later
+- A Campus Coach account (the same one you use on your iPhone)
+- A desktop/laptop with internet access (the scraper runs on your computer,
+  not on the phone)
 
-Install the dependency:
+Install all dependencies in one step:
 
 ```bash
 pip install -r requirements.txt
+python -m playwright install chromium
 ```
 
 ---
@@ -38,96 +39,72 @@ pip install -r requirements.txt
 ## Quick start
 
 ```bash
-# Export from CSV
-python campus_to_calendar.py sample_data/workouts.csv -o workouts.ics
+# 1 – set your credentials (recommended: use env vars so they stay out of
+#     your shell history)
+export CAMPUS_EMAIL="you@example.com"
+export CAMPUS_PASSWORD="yourpassword"
 
-# Export from JSON
-python campus_to_calendar.py sample_data/workouts.json -o workouts.ics
+# 2 – scrape the current week and write workouts.ics
+python scraper.py -o workouts.ics
+
+# 3 – import workouts.ics into Google Calendar
+#     Settings → Import & Export → Import → choose workouts.ics
 ```
 
-Then import `workouts.ics` into your calendar:
+Each workout in the Campus Coach weekly plan becomes a calendar event with:
+- the workout **title** (e.g. *Strength & Conditioning*)
+- the prescribed **duration** (e.g. 30 min)
 
-- **Google Calendar** → Settings → Import & Export → Import
-- **Apple Calendar** → File → Import…
+Events are created as **all-day events** spread across the week (Monday =
+Workout 1, Tuesday = Workout 2, …).  You can drag them to any time slot you
+like in Google Calendar.
 
 ---
 
-## Input format
-
-### CSV
-
-The first row must be a header. Column names:
-
-| Column | Required | Description |
-|---|---|---|
-| `name` | ✅ | Workout title (e.g. *Easy Run*) |
-| `date` | ✅ | Planned date — `YYYY-MM-DD` |
-| `duration_minutes` | ✅ | Planned duration in minutes |
-| `time` | | Start time — `HH:MM` (default: `09:00`) |
-| `distance_km` | | Planned distance in kilometres |
-| `elevation_m` | | Planned elevation gain in metres |
-| `notes` | | Free-text notes |
-
-Example (`sample_data/workouts.csv`):
-
-```csv
-name,date,time,duration_minutes,distance_km,elevation_m,notes
-Easy Run,2024-06-03,07:30,45,8.0,50,Keep heart rate under 140 bpm
-Interval Training,2024-06-05,07:00,60,10.0,30,6x800m at 5K pace with 90s recovery
-Long Run,2024-06-08,08:00,90,16.0,120,Steady aerobic pace throughout
-```
-
-### JSON
-
-A JSON array of objects using the same field names as the CSV columns.
-
-Example (`sample_data/workouts.json`):
-
-```json
-[
-  {
-    "name": "Easy Run",
-    "date": "2024-06-03",
-    "time": "07:30",
-    "duration_minutes": 45,
-    "distance_km": 8.0,
-    "elevation_m": 50,
-    "notes": "Keep heart rate under 140 bpm"
-  }
-]
-```
-
----
-
-## CLI reference
+## Scraper CLI reference
 
 ```
-usage: campus_to_calendar.py [-h] [-o OUTPUT] [-f {csv,json}] input
-
-positional arguments:
-  input                 Path to the input file (CSV or JSON)
+usage: scraper.py [-h] [--email EMAIL] [--password PASSWORD]
+                  [--week YYYY-MM-DD] [-o OUTPUT] [--headed] [--dry-run]
 
 options:
-  -h, --help            Show this help message and exit
-  -o OUTPUT, --output OUTPUT
-                        Path for the output ICS file (default: workouts.ics)
-  -f {csv,json}, --format {csv,json}
-                        Input format — auto-detected from file extension when
-                        not specified
+  --email EMAIL          Campus Coach e-mail (or set CAMPUS_EMAIL env var)
+  --password PASSWORD    Campus Coach password (or set CAMPUS_PASSWORD env var)
+  --week YYYY-MM-DD      Any date within the target week (default: current week)
+  -o OUTPUT              Output ICS file path (default: workouts.ics)
+  --headed               Show the browser window – useful for debugging
+  --dry-run              Print scraped workouts as JSON and exit without writing
+                         an ICS file
 ```
+
+### Scraping a specific week
+
+```bash
+python scraper.py --week 2024-06-10 -o week24.ics
+```
+
+### Debugging when the scraper fails
+
+Run with `--headed` to see exactly what the browser is doing:
+
+```bash
+python scraper.py --headed
+```
+
+If the CSS selectors stop matching after a Campus Coach UI update, open
+`scraper.py` and look for the `SELECTORS` dict near the top of the file.
+Each selector is documented and can be updated independently.
 
 ---
 
-## How to get your planned workouts from Campus Coach
+## Importing into Google Calendar
 
-Campus Coach does not currently offer a direct calendar export.  The easiest
-workflow is:
+1. Open [Google Calendar](https://calendar.google.com) on your computer.
+2. Click the ⚙ gear icon → **Settings**.
+3. In the left panel click **Import & Export**.
+4. Click **Import**, choose the `.ics` file, and click **Import**.
 
-1. Open the Campus Coach app and browse your planned training programme.
-2. Create a CSV or JSON file following the format above, entering one row
-   per planned session.
-3. Run the script and import the resulting `.ics` file into Google Calendar
-   or Apple Calendar.
+For **Apple Calendar**: **File → Import…** → choose the `.ics` file.
 
 ---
 
@@ -138,17 +115,36 @@ pip install pytest
 python -m pytest tests/ -v
 ```
 
+The tests cover all pure-Python logic (duration parsing, date assignment,
+workout extraction) without requiring a real browser or a Campus Coach account.
+
 ---
 
 ## Project layout
 
 ```
 CampusToCalendar/
-├── campus_to_calendar.py   # Main conversion script
+├── scraper.py              # Playwright-based Campus Coach scraper  ← main tool
+├── campus_to_calendar.py   # CSV/JSON → ICS converter (used by scraper)
 ├── requirements.txt
 ├── sample_data/
-│   ├── workouts.csv        # Sample CSV input
-│   └── workouts.json       # Sample JSON input
+│   ├── workouts.csv        # Sample CSV for manual entry
+│   └── workouts.json       # Sample JSON for manual entry
 └── tests/
+    ├── test_scraper.py
     └── test_campus_to_calendar.py
 ```
+
+---
+
+## Manual fallback (CSV / JSON)
+
+If automatic scraping is not working, you can still create the ICS file
+manually by filling in a CSV or JSON file:
+
+```bash
+python campus_to_calendar.py sample_data/workouts.csv -o workouts.ics
+```
+
+See `sample_data/workouts.csv` for the column format.
+
