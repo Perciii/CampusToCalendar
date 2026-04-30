@@ -361,8 +361,7 @@ def main(argv: list[str] | None = None) -> int:
     # --- resolve target week ---
     if args.week:
         try:
-            from datetime import date as _date
-            ref = _date.fromisoformat(args.week)
+            ref = date.fromisoformat(args.week)
         except ValueError:
             print(
                 f"Error: --week must be a date in YYYY-MM-DD format, got '{args.week}'.",
